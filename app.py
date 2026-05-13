@@ -1,6 +1,6 @@
 # app.py (Streamlit Black & White Image to PDF Converter)
 
-```python
+
 import streamlit as st
 from PIL import Image
 from reportlab.pdfgen import canvas
@@ -73,13 +73,6 @@ streamlit run app.py
 ---
 
 # Folder Structure
-
-```text
-project-folder/
-│
-├── app.py
-└── requirements.txt
-```
 
 ---
 
