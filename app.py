@@ -1,95 +1,112 @@
 import streamlit as st
 from PIL import Image
-from collections import Counter
 import numpy as np
+from transformers import pipeline
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
 
-st.set_page_config(page_title="AI Image Analyzer")
+st.title("Image Analyzer")
 
-st.title("AI Image Analyzer")
+classifier = pipeline(
+    "image-classification",
+    model="google/vit-base-patch16-224"
+)
 
 uploaded_file = st.file_uploader(
-    "Upload an image",
+    "Upload Image",
     type=["png", "jpg", "jpeg"]
 )
 
 if uploaded_file is not None:
 
-    image = Image.open(uploaded_file)
+    image = Image.open(uploaded_file).convert("RGB")
 
-    st.image(image, caption="Uploaded Image")
+    st.image(image)
 
     width, height = image.size
 
-    st.subheader("Image Details")
+    image_array = np.array(image)
 
-    st.write("Width:", width)
-    st.write("Height:", height)
-    st.write("Image Mode:", image.mode)
-    st.write("Image Format:", image.format)
-
-    rgb_image = image.convert("RGB")
-
-    image_array = np.array(rgb_image)
-
-    pixels = image_array.reshape(-1, 3)
-
-    avg_color = pixels.mean(axis=0)
+    avg_color = image_array.mean(axis=(0, 1))
 
     r = int(avg_color[0])
     g = int(avg_color[1])
     b = int(avg_color[2])
 
-    st.subheader("Average Color")
+    prediction = classifier(image)[0]
 
-    st.write("Red:", r)
-    st.write("Green:", g)
-    st.write("Blue:", b)
+    label = prediction["label"]
 
-    def detect_main_color(r, g, b):
+    confidence = round(prediction["score"] * 100, 2)
 
-        if r > g and r > b:
-            return "Mostly Red"
+    if r > g and r > b:
+        color_name = "Red"
 
-        elif g > r and g > b:
-            return "Mostly Green"
+    elif g > r and g > b:
+        color_name = "Green"
 
-        elif b > r and b > g:
-            return "Mostly Blue"
+    elif b > r and b > g:
+        color_name = "Blue"
 
-        elif r > 180 and g > 180 and b > 180:
-            return "Mostly White / Bright"
+    else:
+        color_name = "Mixed"
 
-        elif r < 70 and g < 70 and b < 70:
-            return "Mostly Black / Dark"
+    st.write("Detected Object:", label)
 
-        else:
-            return "Mixed Colors"
+    st.write("Confidence:", confidence, "%")
 
-    main_color = detect_main_color(r, g, b)
+    st.write("Width:", width)
 
-    st.write("Dominant Appearance:", main_color)
+    st.write("Height:", height)
 
-    st.subheader("Estimated Objects")
+    st.write("Dominant Color:", color_name)
 
-    gray = rgb_image.convert("L")
+    st.write("RGB:", r, g, b)
 
-    gray_array = np.array(gray)
+    pdf_buffer = BytesIO()
 
-    bright_pixels = np.sum(gray_array > 200)
-    medium_pixels = np.sum((gray_array > 80) & (gray_array <= 200))
-    dark_pixels = np.sum(gray_array <= 80)
+    doc = SimpleDocTemplate(pdf_buffer)
 
-    st.write("Bright Areas:", int(bright_pixels))
-    st.write("Medium Areas:", int(medium_pixels))
-    st.write("Dark Areas:", int(dark_pixels))
+    styles = getSampleStyleSheet()
 
-    st.subheader("Image Summary")
+    content = []
 
-    st.write(
-        "This image is",
-        width,
-        "x",
-        height,
-        "pixels with dominant color:",
-        main_color
+    content.append(
+        Paragraph("Image Analysis Report", styles["Title"])
+    )
+
+    content.append(
+        Paragraph(f"Detected Object: {label}", styles["BodyText"])
+    )
+
+    content.append(
+        Paragraph(f"Confidence: {confidence}%", styles["BodyText"])
+    )
+
+    content.append(
+        Paragraph(f"Width: {width}", styles["BodyText"])
+    )
+
+    content.append(
+        Paragraph(f"Height: {height}", styles["BodyText"])
+    )
+
+    content.append(
+        Paragraph(f"Dominant Color: {color_name}", styles["BodyText"])
+    )
+
+    content.append(
+        Paragraph(f"RGB: {r}, {g}, {b}", styles["BodyText"])
+    )
+
+    doc.build(content)
+
+    pdf_buffer.seek(0)
+
+    st.download_button(
+        label="Download PDF",
+        data=pdf_buffer,
+        file_name="report.pdf",
+        mime="application/pdf"
     )
