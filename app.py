@@ -1,106 +1,98 @@
 import streamlit as st
-from PIL import Image
+import face_recognition
 import numpy as np
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-from io import BytesIO
+from PIL import Image
+import os
 
-st.title("Image Analyzer")
+st.title("Celebrity Face Detector")
+
+known_face_encodings = []
+known_face_names = []
+
+celebrity_folder = "celebrities"
+
+for filename in os.listdir(celebrity_folder):
+
+    if filename.endswith(".jpg") or filename.endswith(".png"):
+
+        image_path = os.path.join(
+            celebrity_folder,
+            filename
+        )
+
+        image = face_recognition.load_image_file(
+            image_path
+        )
+
+        encodings = face_recognition.face_encodings(
+            image
+        )
+
+        if len(encodings) > 0:
+
+            known_face_encodings.append(
+                encodings[0]
+            )
+
+            name = os.path.splitext(
+                filename
+            )[0]
+
+            known_face_names.append(name)
 
 uploaded_file = st.file_uploader(
-    "Upload Image",
-    type=["png", "jpg", "jpeg"]
+    "Upload an Image",
+    type=["jpg", "jpeg", "png"]
 )
 
 if uploaded_file is not None:
 
-    image = Image.open(uploaded_file).convert("RGB")
+    image = Image.open(uploaded_file)
 
     st.image(image)
 
-    width, height = image.size
-
     image_array = np.array(image)
 
-    avg_color = image_array.mean(axis=(0, 1))
+    uploaded_encodings = face_recognition.face_encodings(
+        image_array
+    )
 
-    r = int(avg_color[0])
-    g = int(avg_color[1])
-    b = int(avg_color[2])
+    if len(uploaded_encodings) > 0:
 
-    if r > g and r > b:
-        color_name = "Mostly Red"
+        uploaded_face = uploaded_encodings[0]
 
-    elif g > r and g > b:
-        color_name = "Mostly Green"
+        matches = face_recognition.compare_faces(
+            known_face_encodings,
+            uploaded_face
+        )
 
-    elif b > r and b > g:
-        color_name = "Mostly Blue"
+        face_distances = face_recognition.face_distance(
+            known_face_encodings,
+            uploaded_face
+        )
+
+        best_match_index = np.argmin(
+            face_distances
+        )
+
+        if matches[best_match_index]:
+
+            detected_name = known_face_names[
+                best_match_index
+            ]
+
+            st.success(
+                f"Detected Celebrity: {detected_name}"
+            )
+
+        else:
+
+            st.warning(
+                "No celebrity match found"
+            )
 
     else:
-        color_name = "Mixed Colors"
 
-    if width > 1000 and height > 1000:
-        image_type = "High Resolution Image"
-
-    elif width > height:
-        image_type = "Landscape Style Image"
-
-    elif height > width:
-        image_type = "Portrait Style Image"
-
-    else:
-        image_type = "Square Image"
-
-    st.write("Image Type:", image_type)
-
-    st.write("Width:", width)
-
-    st.write("Height:", height)
-
-    st.write("Dominant Color:", color_name)
-
-    st.write("RGB:", r, g, b)
-
-    pdf_buffer = BytesIO()
-
-    doc = SimpleDocTemplate(pdf_buffer)
-
-    styles = getSampleStyleSheet()
-
-    content = []
-
-    content.append(
-        Paragraph("Image Analysis Report", styles["Title"])
-    )
-
-    content.append(
-        Paragraph(f"Image Type: {image_type}", styles["BodyText"])
-    )
-
-    content.append(
-        Paragraph(f"Width: {width}", styles["BodyText"])
-    )
-
-    content.append(
-        Paragraph(f"Height: {height}", styles["BodyText"])
-    )
-
-    content.append(
-        Paragraph(f"Dominant Color: {color_name}", styles["BodyText"])
-    )
-
-    content.append(
-        Paragraph(f"RGB: {r}, {g}, {b}", styles["BodyText"])
-    )
-
-    doc.build(content)
-
-    pdf_buffer.seek(0)
-
-    st.download_button(
-        label="Download PDF",
-        data=pdf_buffer,
-        file_name="report.pdf",
-        mime="application/pdf"
-    )
+        st.error(
+            "No face detected in image"
+        )
