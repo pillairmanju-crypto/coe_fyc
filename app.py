@@ -1,13 +1,11 @@
 import streamlit as st
 from PIL import Image
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from io import BytesIO
-import tempfile
+from collections import Counter
+import numpy as np
 
-st.set_page_config(page_title="Black and White PDF Converter")
+st.set_page_config(page_title="AI Image Analyzer")
 
-st.title("Black and White Image to PDF Converter")
+st.title("AI Image Analyzer")
 
 uploaded_file = st.file_uploader(
     "Upload an image",
@@ -18,36 +16,80 @@ if uploaded_file is not None:
 
     image = Image.open(uploaded_file)
 
-    bw_image = image.convert("L")
+    st.image(image, caption="Uploaded Image")
 
-    st.image(bw_image, caption="Black and White Preview")
+    width, height = image.size
 
-    temp_image = tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix=".png"
-    )
+    st.subheader("Image Details")
 
-    bw_image.save(temp_image.name)
+    st.write("Width:", width)
+    st.write("Height:", height)
+    st.write("Image Mode:", image.mode)
+    st.write("Image Format:", image.format)
 
-    pdf_buffer = BytesIO()
+    rgb_image = image.convert("RGB")
 
-    pdf = canvas.Canvas(pdf_buffer, pagesize=letter)
+    image_array = np.array(rgb_image)
 
-    pdf.drawImage(
-        temp_image.name,
-        50,
-        200,
-        width=500,
-        preserveAspectRatio=True
-    )
+    pixels = image_array.reshape(-1, 3)
 
-    pdf.save()
+    avg_color = pixels.mean(axis=0)
 
-    pdf_buffer.seek(0)
+    r = int(avg_color[0])
+    g = int(avg_color[1])
+    b = int(avg_color[2])
 
-    st.download_button(
-        label="Download PDF",
-        data=pdf_buffer,
-        file_name="black_white_image.pdf",
-        mime="application/pdf"
+    st.subheader("Average Color")
+
+    st.write("Red:", r)
+    st.write("Green:", g)
+    st.write("Blue:", b)
+
+    def detect_main_color(r, g, b):
+
+        if r > g and r > b:
+            return "Mostly Red"
+
+        elif g > r and g > b:
+            return "Mostly Green"
+
+        elif b > r and b > g:
+            return "Mostly Blue"
+
+        elif r > 180 and g > 180 and b > 180:
+            return "Mostly White / Bright"
+
+        elif r < 70 and g < 70 and b < 70:
+            return "Mostly Black / Dark"
+
+        else:
+            return "Mixed Colors"
+
+    main_color = detect_main_color(r, g, b)
+
+    st.write("Dominant Appearance:", main_color)
+
+    st.subheader("Estimated Objects")
+
+    gray = rgb_image.convert("L")
+
+    gray_array = np.array(gray)
+
+    bright_pixels = np.sum(gray_array > 200)
+    medium_pixels = np.sum((gray_array > 80) & (gray_array <= 200))
+    dark_pixels = np.sum(gray_array <= 80)
+
+    st.write("Bright Areas:", int(bright_pixels))
+    st.write("Medium Areas:", int(medium_pixels))
+    st.write("Dark Areas:", int(dark_pixels))
+
+    st.subheader("Image Summary")
+
+    st.write(
+        "This image is",
+        width,
+        "x",
+        height,
+        "pixels with dominant color:",
+        main_color
     )
