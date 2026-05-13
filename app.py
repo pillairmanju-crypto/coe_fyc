@@ -1,17 +1,11 @@
 import streamlit as st
 from PIL import Image
 import numpy as np
-from transformers import pipeline
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
 from io import BytesIO
 
 st.title("Image Analyzer")
-
-classifier = pipeline(
-    "image-classification",
-    model="google/vit-base-patch16-224"
-)
 
 uploaded_file = st.file_uploader(
     "Upload Image",
@@ -34,27 +28,31 @@ if uploaded_file is not None:
     g = int(avg_color[1])
     b = int(avg_color[2])
 
-    prediction = classifier(image)[0]
-
-    label = prediction["label"]
-
-    confidence = round(prediction["score"] * 100, 2)
-
     if r > g and r > b:
-        color_name = "Red"
+        color_name = "Mostly Red"
 
     elif g > r and g > b:
-        color_name = "Green"
+        color_name = "Mostly Green"
 
     elif b > r and b > g:
-        color_name = "Blue"
+        color_name = "Mostly Blue"
 
     else:
-        color_name = "Mixed"
+        color_name = "Mixed Colors"
 
-    st.write("Detected Object:", label)
+    if width > 1000 and height > 1000:
+        image_type = "High Resolution Image"
 
-    st.write("Confidence:", confidence, "%")
+    elif width > height:
+        image_type = "Landscape Style Image"
+
+    elif height > width:
+        image_type = "Portrait Style Image"
+
+    else:
+        image_type = "Square Image"
+
+    st.write("Image Type:", image_type)
 
     st.write("Width:", width)
 
@@ -77,11 +75,7 @@ if uploaded_file is not None:
     )
 
     content.append(
-        Paragraph(f"Detected Object: {label}", styles["BodyText"])
-    )
-
-    content.append(
-        Paragraph(f"Confidence: {confidence}%", styles["BodyText"])
+        Paragraph(f"Image Type: {image_type}", styles["BodyText"])
     )
 
     content.append(
